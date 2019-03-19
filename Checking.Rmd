@@ -1,0 +1,75 @@
+---
+title: "Piper Stemming"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+source("Schinke_Latin_Stemming.R")
+library(tidytext)
+
+test = "Arma virumque cano, Troiae qui primus ab oris Italiam, fato profugus, Laviniaque venit litora, multum ille et terris iactatus et alto vi superum saevae memorem Iunonis ob iram; multa quoque et bello passus, dum conderet urbem, inferretque deos Latio, genus unde Latinum, Albanique patres, atque altae moenia Romae."
+
+cat(schinke_latin_stemming_passage(test))
+```
+
+The function for stemming passages assumes that all words are nouns. This means verbs like `resurrexit` aren't stemmed
+at all, and words like 'dia' are silently removed for being too short.
+
+```{r}
+y = schinke_latin_stemming_passage("et resurrexit tertia dia")
+z = schinke_latin_stemming("resurrexit", "verb")
+c(y, z)
+```
+
+```{r}
+
+library(tidytext)
+library(tidyverse)
+ 
+plot = function(scale, stem, even_chunks = FALSE) {
+books = c("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII")
+read_book = function(fname) data_frame(text = read_file(str_glue("Latin/Liber {fname}.txt")), book = match(fname, books))
+
+
+books %>% map_dfr(read_book) %>%
+  unnest_tokens(caput, text, token = "regex", pattern="CAPUT [0-9]+\n") %>%
+  unnest_tokens(word, caput) -> tokenized
+
+# Da does not provide 20th chunked text, just tenth-chunked.
+if (even_chunks) tokenized = tokenized %>% mutate(book = 1 + floor(20 * 1:n()/(n() + .01)))
+counts = tokenized %>% 
+  group_by(book) %>% count(word) -> counted
+
+
+if (stem) {
+  stemmed = counted %>% ungroup %>% distinct(word) %>% group_by(word) %>% do(stemmed = schinke_latin_stemming(.$word))
+  # Oh geez this returns null on a bunch of words.
+  silent = stemmed %>% filter(is.null(stemmed))
+  silent %>% inner_join(counted) %>% filter(is.null(stemmed)) %>% arrange(-n)
+  counted %>% inner_join(stemmed) %>% 
+    mutate(stemmed = as.character(stemmed)) %>% 
+    filter(!is.null(stemmed)) %>%
+    group_by(book) %>% count(stemmed, wt=n) %>%
+    rename(word = stemmed) -> counted
+}
+
+spreaded = counted %>% group_by(book) %>% mutate(n = n/sum(n)) %>% spread(word, n, fill = 0)
+  
+mat = spreaded %>% ungroup %>% select(-book) %>% as.matrix
+mat[1:10, 1:10]
+if (scale) mat = apply(mat, 2, scale)
+?prcomp
+mat %>% prcomp %>% predict %>% as_data_frame() %>% mutate(book = 1:nrow(mat)) %>%
+  ggplot() + geom_text(aes(x=PC1, y = PC2, label = book))
+}
+```
+
+```{r}
+plot(scale = TRUE, stem = TRUE)
+ggsave("~/Dropbox/benschmidt/static/img/mds_piper_unscaled_unstemmed.png")
+```
+```

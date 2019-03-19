@@ -1,8 +1,9 @@
 library("tm")
-source('Schinke_Latin_Stemming.r')
-setwd('~/Documents/UChicago/Literature/5/')
+source('Schinke_Latin_Stemming.R')
+# setwd('~/Documents/UChicago/Literature/5/')
 
 dir_name = list(Latin=c("Latin",10), Latin_10_cut=c("Latin",5), Latin_2_cut=c("Latin",1), English=c("English",3), English_10_cut=c("English",5),English_2_cut=c("English",1))
+
 for (k in names(dir_name)) {
   v = dir_name[[k]]
   lan = v[1]
